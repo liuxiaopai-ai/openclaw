@@ -38,6 +38,7 @@ const PLUGIN_REQUIRED_COMMANDS = new Set([
 ]);
 const CONFIG_GUARD_BYPASS_COMMANDS = new Set(["doctor", "completion", "secrets"]);
 const JSON_PARSE_ONLY_COMMANDS = new Set(["config set"]);
+const STDOUT_PROTOCOL_COMMANDS = new Set(["acp client"]);
 let configGuardModulePromise: Promise<typeof import("./config-guard.js")> | undefined;
 let pluginRegistryModulePromise: Promise<typeof import("../plugin-registry.js")> | undefined;
 
@@ -88,10 +89,13 @@ function getCliLogLevel(actionCommand: Command): LogLevel | undefined {
 }
 
 function isJsonOutputMode(commandPath: string[], argv: string[]): boolean {
+  const key = `${commandPath[0] ?? ""} ${commandPath[1] ?? ""}`.trim();
+  if (STDOUT_PROTOCOL_COMMANDS.has(key)) {
+    return true;
+  }
   if (!hasFlag(argv, "--json")) {
     return false;
   }
-  const key = `${commandPath[0] ?? ""} ${commandPath[1] ?? ""}`.trim();
   if (JSON_PARSE_ONLY_COMMANDS.has(key)) {
     return false;
   }

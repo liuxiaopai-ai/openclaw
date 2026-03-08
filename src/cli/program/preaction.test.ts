@@ -83,6 +83,10 @@ describe("registerPreActionHooks", () => {
     program.command("doctor").action(() => {});
     program.command("completion").action(() => {});
     program.command("secrets").action(() => {});
+    program
+      .command("acp")
+      .command("client")
+      .action(() => {});
     program.command("agents").action(() => {});
     program.command("configure").action(() => {});
     program.command("onboard").action(() => {});
@@ -205,6 +209,19 @@ describe("registerPreActionHooks", () => {
     expect(ensureConfigReadyMock).toHaveBeenCalledWith({
       runtime: runtimeMock,
       commandPath: ["config", "set"],
+    });
+  });
+
+  it("suppresses doctor stdout for ACP client protocol sessions", async () => {
+    await runPreAction({
+      parseArgv: ["acp", "client"],
+      processArgv: ["node", "openclaw", "acp", "client"],
+    });
+
+    expect(ensureConfigReadyMock).toHaveBeenCalledWith({
+      runtime: runtimeMock,
+      commandPath: ["acp", "client"],
+      suppressDoctorStdout: true,
     });
   });
 
