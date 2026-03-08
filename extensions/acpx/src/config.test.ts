@@ -22,6 +22,7 @@ describe("acpx plugin config parsing", () => {
     expect(resolved.allowPluginLocalInstall).toBe(true);
     expect(resolved.cwd).toBe(path.resolve("/tmp/workspace"));
     expect(resolved.strictWindowsCmdWrapper).toBe(true);
+    expect(resolved.queueOwnerTtlSeconds).toBe(60);
     expect(resolved.mcpServers).toEqual({});
   });
 

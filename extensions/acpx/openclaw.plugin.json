@@ -33,7 +33,8 @@
       },
       "queueOwnerTtlSeconds": {
         "type": "number",
-        "minimum": 0
+        "minimum": 0,
+        "default": 60
       },
       "mcpServers": {
         "type": "object",
@@ -93,7 +94,7 @@
     },
     "queueOwnerTtlSeconds": {
       "label": "Queue Owner TTL Seconds",
-      "help": "Idle queue-owner TTL for acpx prompt turns. Keep this short in OpenClaw to avoid delayed completion after each turn.",
+      "help": "How long acpx waits for a runtime to claim a prompt queue. Increase this for slower cold starts such as Codex CLI.",
       "advanced": true
     },
     "mcpServers": {

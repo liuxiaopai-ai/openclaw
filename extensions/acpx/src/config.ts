@@ -59,7 +59,7 @@ export type ResolvedAcpxPluginConfig = {
 
 const DEFAULT_PERMISSION_MODE: AcpxPermissionMode = "approve-reads";
 const DEFAULT_NON_INTERACTIVE_POLICY: AcpxNonInteractivePermissionPolicy = "fail";
-const DEFAULT_QUEUE_OWNER_TTL_SECONDS = 0.1;
+const DEFAULT_QUEUE_OWNER_TTL_SECONDS = 60;
 const DEFAULT_STRICT_WINDOWS_CMD_WRAPPER = true;
 
 type ParseResult =
@@ -280,7 +280,11 @@ export function createAcpxPluginConfigSchema(): OpenClawPluginConfigSchema {
         },
         strictWindowsCmdWrapper: { type: "boolean" },
         timeoutSeconds: { type: "number", minimum: 0.001 },
-        queueOwnerTtlSeconds: { type: "number", minimum: 0 },
+        queueOwnerTtlSeconds: {
+          type: "number",
+          minimum: 0,
+          default: DEFAULT_QUEUE_OWNER_TTL_SECONDS,
+        },
         mcpServers: {
           type: "object",
           additionalProperties: {

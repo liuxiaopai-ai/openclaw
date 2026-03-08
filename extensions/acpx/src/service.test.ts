@@ -139,7 +139,7 @@ describe("createAcpxRuntimeService", () => {
     );
   });
 
-  it("uses a short default queue-owner TTL", async () => {
+  it("uses a long enough default queue-owner TTL for cold starts", async () => {
     const { runtime } = createRuntimeStub(true);
     const runtimeFactory = vi.fn(() => runtime);
     const service = createAcpxRuntimeService({
@@ -151,7 +151,7 @@ describe("createAcpxRuntimeService", () => {
 
     expect(runtimeFactory).toHaveBeenCalledWith(
       expect.objectContaining({
-        queueOwnerTtlSeconds: 0.1,
+        queueOwnerTtlSeconds: 60,
       }),
     );
   });
