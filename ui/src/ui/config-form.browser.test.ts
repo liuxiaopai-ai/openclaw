@@ -33,6 +33,31 @@ const rootSchema = {
   },
 };
 
+const secretInputSchema = {
+  anyOf: [
+    { type: "string" },
+    {
+      type: "object",
+      properties: {
+        source: {
+          type: "string",
+          enum: ["env", "file", "exec"],
+        },
+        provider: {
+          type: "string",
+          minLength: 1,
+        },
+        id: {
+          type: "string",
+          minLength: 1,
+        },
+      },
+      required: ["source", "provider", "id"],
+      additionalProperties: false,
+    },
+  ],
+};
+
 describe("config form renderer", () => {
   it("renders inputs and patches values", () => {
     const onPatch = vi.fn();
@@ -318,35 +343,7 @@ describe("config form renderer", () => {
               additionalProperties: {
                 type: "object",
                 properties: {
-                  apiKey: {
-                    anyOf: [
-                      { type: "string" },
-                      {
-                        oneOf: [
-                          {
-                            type: "object",
-                            properties: {
-                              source: { type: "string", const: "env" },
-                              provider: { type: "string" },
-                              id: { type: "string" },
-                            },
-                            required: ["source", "provider", "id"],
-                            additionalProperties: false,
-                          },
-                          {
-                            type: "object",
-                            properties: {
-                              source: { type: "string", const: "file" },
-                              provider: { type: "string" },
-                              id: { type: "string" },
-                            },
-                            required: ["source", "provider", "id"],
-                            additionalProperties: false,
-                          },
-                        ],
-                      },
-                    ],
-                  },
+                  apiKey: secretInputSchema,
                 },
               },
             },
@@ -379,6 +376,51 @@ describe("config form renderer", () => {
     apiKeyInput.value = "new-key";
     apiKeyInput.dispatchEvent(new Event("input", { bubbles: true }));
     expect(onPatch).toHaveBeenCalledWith(["models", "providers", "openai", "apiKey"], "new-key");
+  });
+
+  it("supports direct SecretInput fields from buildSecretInputSchema", () => {
+    const onPatch = vi.fn();
+    const container = document.createElement("div");
+    const schema = {
+      type: "object",
+      properties: {
+        channels: {
+          type: "object",
+          properties: {
+            feishu: {
+              type: "object",
+              properties: {
+                appSecret: secretInputSchema,
+              },
+            },
+          },
+        },
+      },
+    };
+    const analysis = analyzeConfigSchema(schema);
+    expect(analysis.unsupportedPaths).not.toContain("channels.feishu.appSecret");
+
+    render(
+      renderConfigForm({
+        schema: analysis.schema,
+        uiHints: {
+          "channels.feishu.appSecret": { sensitive: true },
+        },
+        unsupportedPaths: analysis.unsupportedPaths,
+        value: { channels: { feishu: { appSecret: "old-secret" } } }, // pragma: allowlist secret
+        onPatch,
+      }),
+      container,
+    );
+
+    const secretInput: HTMLInputElement | null = container.querySelector("input[type='password']");
+    expect(secretInput).not.toBeNull();
+    if (!secretInput) {
+      return;
+    }
+    secretInput.value = "updated-secret";
+    secretInput.dispatchEvent(new Event("input", { bubbles: true }));
+    expect(onPatch).toHaveBeenCalledWith(["channels", "feishu", "appSecret"], "updated-secret");
   });
 
   it("flags unsupported unions", () => {

@@ -130,13 +130,19 @@ function isSecretRefVariant(entry: JsonSchema): boolean {
     return false;
   }
   return (
-    typeof source.const === "string" &&
+    (typeof source.const === "string" ||
+      (Array.isArray(source.enum) &&
+        source.enum.length > 0 &&
+        source.enum.every((value) => typeof value === "string"))) &&
     schemaType(provider) === "string" &&
     schemaType(id) === "string"
   );
 }
 
-function isSecretRefUnion(entry: JsonSchema): boolean {
+function isSecretRefSchema(entry: JsonSchema): boolean {
+  if (isSecretRefVariant(entry)) {
+    return true;
+  }
   const variants = entry.oneOf ?? entry.anyOf;
   if (!variants || variants.length === 0) {
     return false;
@@ -155,7 +161,7 @@ function normalizeSecretInputUnion(
     return null;
   }
   const nonString = remaining.filter((_, index) => index !== stringIndex);
-  if (nonString.length !== 1 || !isSecretRefUnion(nonString[0])) {
+  if (nonString.length !== 1 || !isSecretRefSchema(nonString[0])) {
     return null;
   }
   return normalizeSchemaNode(
