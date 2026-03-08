@@ -639,6 +639,9 @@ export function registerPluginsCli(program: Command) {
       ) {
         preview.push("load path");
       }
+      if (cfg.channels && pluginId in cfg.channels) {
+        preview.push("channel config");
+      }
       if (cfg.plugins?.slots?.memory === pluginId) {
         preview.push(`memory slot (will reset to "memory-core")`);
       }
@@ -702,6 +705,9 @@ export function registerPluginsCli(program: Command) {
       }
       if (result.actions.loadPath) {
         removed.push("load path");
+      }
+      if (result.actions.channelConfig) {
+        removed.push("channel config");
       }
       if (result.actions.memorySlot) {
         removed.push("memory slot");

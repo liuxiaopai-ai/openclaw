@@ -171,6 +171,31 @@ describe("removePluginFromConfig", () => {
     expect(actions.loadPath).toBe(true);
   });
 
+  it("removes plugin channel config", () => {
+    const config: OpenClawConfig = {
+      channels: {
+        chatmax: {
+          enabled: true,
+          botToken: "token",
+        },
+        slack: {
+          enabled: true,
+        },
+      },
+      plugins: {
+        entries: {
+          chatmax: { enabled: true },
+        },
+      },
+    };
+
+    const { config: result, actions } = removePluginFromConfig(config, "chatmax");
+
+    expect(result.channels?.chatmax).toBeUndefined();
+    expect(result.channels?.slack).toEqual({ enabled: true });
+    expect(actions.channelConfig).toBe(true);
+  });
+
   it("cleans up load when removing the only linked path", () => {
     const config: OpenClawConfig = {
       plugins: {
@@ -294,6 +319,11 @@ describe("removePluginFromConfig", () => {
 
   it("preserves other config values", () => {
     const config: OpenClawConfig = {
+      channels: {
+        slack: {
+          enabled: true,
+        },
+      },
       plugins: {
         enabled: true,
         deny: ["denied-plugin"],
@@ -307,6 +337,7 @@ describe("removePluginFromConfig", () => {
 
     expect(result.plugins?.enabled).toBe(true);
     expect(result.plugins?.deny).toEqual(["denied-plugin"]);
+    expect(result.channels?.slack).toEqual({ enabled: true });
   });
 });
 
@@ -337,6 +368,12 @@ describe("uninstallPlugin", () => {
 
   it("removes config entries", async () => {
     const config: OpenClawConfig = {
+      channels: {
+        "my-plugin": {
+          enabled: true,
+          defaultTo: "group-1",
+        },
+      },
       plugins: {
         entries: {
           "my-plugin": { enabled: true },
@@ -355,8 +392,10 @@ describe("uninstallPlugin", () => {
 
     expect(result.ok).toBe(true);
     if (result.ok) {
+      expect(result.config.channels?.["my-plugin"]).toBeUndefined();
       expect(result.config.plugins?.entries).toBeUndefined();
       expect(result.config.plugins?.installs).toBeUndefined();
+      expect(result.actions.channelConfig).toBe(true);
       expect(result.actions.entry).toBe(true);
       expect(result.actions.install).toBe(true);
     }
