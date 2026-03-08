@@ -1,3 +1,4 @@
+import path from "node:path";
 import { getAcpSessionManager } from "../acp/control-plane/manager.js";
 import { resolveAcpAgentPolicyError, resolveAcpDispatchPolicyError } from "../acp/policy.js";
 import { toAcpRuntimeError } from "../acp/runtime/errors.js";
@@ -35,7 +36,7 @@ import {
 } from "../agents/model-selection.js";
 import { runEmbeddedPiAgent } from "../agents/pi-embedded.js";
 import { buildWorkspaceSkillSnapshot } from "../agents/skills.js";
-import { getSkillsSnapshotVersion } from "../agents/skills/refresh.js";
+import { ensureSkillsWatcher, getSkillsSnapshotVersion } from "../agents/skills/refresh.js";
 import { normalizeSpawnedRunMetadata } from "../agents/spawned-context.js";
 import { resolveAgentTimeoutMs } from "../agents/timeout.js";
 import { ensureAgentWorkspace } from "../agents/workspace.js";
@@ -80,6 +81,7 @@ import {
   registerAgentRunContext,
 } from "../infra/agent-events.js";
 import { buildOutboundSessionContext } from "../infra/outbound/session-context.js";
+import { isPathInside } from "../infra/path-guards.js";
 import { getRemoteSkillEligibility } from "../infra/skills-remote.js";
 import { normalizeAgentId } from "../routing/session-key.js";
 import { defaultRuntime, type RuntimeEnv } from "../runtime.js";
@@ -136,6 +138,43 @@ async function persistSessionEntry(params: PersistSessionEntryParams): Promise<v
     return merged;
   });
   params.sessionStore[params.sessionKey] = persisted;
+}
+
+const WORKSPACE_SCOPED_SKILL_SOURCE_ROOTS = {
+  "openclaw-workspace": (workspaceDir: string) => path.join(workspaceDir, "skills"),
+  "agents-skills-project": (workspaceDir: string) => path.join(workspaceDir, ".agents", "skills"),
+} as const;
+
+function shouldRefreshSkillsSnapshotForAgentRun(params: {
+  snapshot?: SessionEntry["skillsSnapshot"];
+  workspaceDir: string;
+  snapshotVersion: number;
+}): boolean {
+  const snapshot = params.snapshot;
+  if (!snapshot) {
+    return false;
+  }
+  if (params.snapshotVersion > 0 && (snapshot.version ?? 0) < params.snapshotVersion) {
+    return true;
+  }
+  const workspaceDir = params.workspaceDir.trim();
+  if (!workspaceDir || !snapshot.resolvedSkills?.length) {
+    return false;
+  }
+  return snapshot.resolvedSkills.some((skill) => {
+    const resolveExpectedRoot =
+      WORKSPACE_SCOPED_SKILL_SOURCE_ROOTS[
+        skill.source as keyof typeof WORKSPACE_SCOPED_SKILL_SOURCE_ROOTS
+      ];
+    if (!resolveExpectedRoot) {
+      return false;
+    }
+    const expectedRoot = resolveExpectedRoot(workspaceDir);
+    const candidates = [skill.filePath, skill.baseDir].filter(
+      (value): value is string => typeof value === "string" && value.trim().length > 0,
+    );
+    return !candidates.some((candidate) => isPathInside(expectedRoot, candidate));
+  });
 }
 
 function resolveFallbackRetryPrompt(params: { body: string; isFallbackRetry: boolean }): string {
@@ -768,8 +807,15 @@ async function agentCommandInternal(
       });
     }
 
-    const needsSkillsSnapshot = isNewSession || !sessionEntry?.skillsSnapshot;
+    ensureSkillsWatcher({ workspaceDir, config: cfg });
     const skillsSnapshotVersion = getSkillsSnapshotVersion(workspaceDir);
+    const shouldRefreshSkillsSnapshot = shouldRefreshSkillsSnapshotForAgentRun({
+      snapshot: sessionEntry?.skillsSnapshot,
+      workspaceDir,
+      snapshotVersion: skillsSnapshotVersion,
+    });
+    const needsSkillsSnapshot =
+      isNewSession || !sessionEntry?.skillsSnapshot || shouldRefreshSkillsSnapshot;
     const skillFilter = resolveAgentSkillsFilter(cfg, sessionAgentId);
     const skillsSnapshot = needsSkillsSnapshot
       ? buildWorkspaceSkillSnapshot(workspaceDir, {

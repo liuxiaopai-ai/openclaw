@@ -8,6 +8,8 @@ import { FailoverError } from "../agents/failover-error.js";
 import { loadModelCatalog } from "../agents/model-catalog.js";
 import * as modelSelectionModule from "../agents/model-selection.js";
 import { runEmbeddedPiAgent } from "../agents/pi-embedded.js";
+import * as skillsModule from "../agents/skills.js";
+import * as skillsRefreshModule from "../agents/skills/refresh.js";
 import * as commandSecretGatewayModule from "../cli/command-secret-gateway.js";
 import type { OpenClawConfig } from "../config/config.js";
 import * as configModule from "../config/config.js";
@@ -40,6 +42,7 @@ vi.mock("../agents/skills.js", () => ({
 }));
 
 vi.mock("../agents/skills/refresh.js", () => ({
+  ensureSkillsWatcher: vi.fn(),
   getSkillsSnapshotVersion: vi.fn(() => 0),
 }));
 
@@ -357,6 +360,92 @@ describe("agentCommand", () => {
       >;
       const entry = Object.values(saved)[0];
       expect(entry.sessionId).toBeTruthy();
+    });
+  });
+
+  it("refreshes stale workspace skill snapshots after the workspace path changes", async () => {
+    await withTempHome(async (home) => {
+      const store = path.join(home, "sessions.json");
+      const workspaceDir = path.join(home, "ai-notes");
+      const sessionKey = "agent:main:main";
+      const freshSnapshot = {
+        prompt: "fresh skills",
+        skills: [{ name: "local-skill" }],
+        resolvedSkills: [
+          {
+            name: "local-skill",
+            description: "Local skill",
+            filePath: path.join(workspaceDir, "skills", "local-skill", "SKILL.md"),
+            baseDir: path.join(workspaceDir, "skills", "local-skill"),
+            source: "openclaw-workspace",
+            disableModelInvocation: false,
+          },
+        ],
+        version: 0,
+      };
+      writeSessionStoreSeed(store, {
+        [sessionKey]: {
+          sessionId: "session-stale-skills",
+          updatedAt: Date.now(),
+          skillsSnapshot: {
+            prompt: "stale skills",
+            skills: [{ name: "local-skill" }],
+            resolvedSkills: [
+              {
+                name: "local-skill",
+                description: "Local skill",
+                filePath: path.join(
+                  home,
+                  "Library",
+                  "Mobile Documents",
+                  "iCloud~md~obsidian",
+                  "Documents",
+                  "notes",
+                  "skills",
+                  "local-skill",
+                  "SKILL.md",
+                ),
+                baseDir: path.join(
+                  home,
+                  "Library",
+                  "Mobile Documents",
+                  "iCloud~md~obsidian",
+                  "Documents",
+                  "notes",
+                  "skills",
+                  "local-skill",
+                ),
+                source: "openclaw-workspace",
+                disableModelInvocation: false,
+              },
+            ],
+            version: 0,
+          },
+        },
+      });
+      mockConfig(home, store, { workspace: workspaceDir });
+      vi.mocked(skillsModule.buildWorkspaceSkillSnapshot).mockReturnValueOnce(
+        freshSnapshot as never,
+      );
+
+      await agentCommand({ message: "hi", sessionKey }, runtime);
+
+      expect(skillsRefreshModule.ensureSkillsWatcher).toHaveBeenCalledWith({
+        workspaceDir,
+        config: expect.objectContaining({
+          agents: expect.objectContaining({
+            defaults: expect.objectContaining({ workspace: workspaceDir }),
+          }),
+        }),
+      });
+      expect(skillsModule.buildWorkspaceSkillSnapshot).toHaveBeenCalledWith(
+        workspaceDir,
+        expect.objectContaining({ snapshotVersion: 0 }),
+      );
+
+      const saved = readSessionStore<{ skillsSnapshot?: typeof freshSnapshot }>(store);
+      expect(saved[sessionKey]?.skillsSnapshot).toEqual(freshSnapshot);
+      expect(getLastEmbeddedCall()?.skillsSnapshot).toEqual(freshSnapshot);
     });
   });
 
