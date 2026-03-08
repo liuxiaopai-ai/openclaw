@@ -1,5 +1,7 @@
+import path from "node:path";
 import type { OpenClawConfig } from "../config/config.js";
-import { resolveAgentWorkspaceDir, resolveDefaultAgentId } from "./agent-scope.js";
+import { DEFAULT_AGENT_ID } from "../routing/session-key.js";
+import { listAgentIds, resolveAgentWorkspaceDir, resolveDefaultAgentId } from "./agent-scope.js";
 
 export function listAgentWorkspaceDirs(cfg: OpenClawConfig): string[] {
   const dirs = new Set<string>();
@@ -13,4 +15,20 @@ export function listAgentWorkspaceDirs(cfg: OpenClawConfig): string[] {
   }
   dirs.add(resolveAgentWorkspaceDir(cfg, resolveDefaultAgentId(cfg)));
   return [...dirs];
+}
+
+export function isAgentWorkspaceShared(cfg: OpenClawConfig, agentId: string): boolean {
+  const targetWorkspaceDir = path.resolve(resolveAgentWorkspaceDir(cfg, agentId));
+  const otherAgentIds = new Set<string>([
+    DEFAULT_AGENT_ID,
+    ...listAgentIds(cfg),
+    resolveDefaultAgentId(cfg),
+  ]);
+  otherAgentIds.delete(agentId);
+  for (const otherAgentId of otherAgentIds) {
+    if (path.resolve(resolveAgentWorkspaceDir(cfg, otherAgentId)) === targetWorkspaceDir) {
+      return true;
+    }
+  }
+  return false;
 }

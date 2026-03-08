@@ -1,6 +1,7 @@
 import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
+import { isAgentWorkspaceShared } from "../agents/workspace-dirs.js";
 import type { OpenClawConfig } from "../config/config.js";
 import { resolveStateDir } from "../config/paths.js";
 import {
@@ -245,5 +246,23 @@ describe("agents helpers", () => {
     expect(result.config.tools?.agentToAgent?.allow).toEqual(["home"]);
     expect(result.removedBindings).toBe(1);
     expect(result.removedAllow).toBe(1);
+  });
+
+  it("detects when another agent shares the same workspace", () => {
+    const cfg: OpenClawConfig = {
+      agents: {
+        defaults: {
+          workspace: "/shared",
+        },
+        list: [
+          { id: "main", default: true },
+          { id: "work", workspace: "/shared" },
+          { id: "solo", workspace: "/solo" },
+        ],
+      },
+    };
+
+    expect(isAgentWorkspaceShared(cfg, "work")).toBe(true);
+    expect(isAgentWorkspaceShared(cfg, "solo")).toBe(false);
   });
 });

@@ -5,6 +5,7 @@ import {
   resolveAgentDir,
   resolveAgentWorkspaceDir,
 } from "../../agents/agent-scope.js";
+import { isAgentWorkspaceShared } from "../../agents/workspace-dirs.js";
 import {
   DEFAULT_AGENTS_FILENAME,
   DEFAULT_BOOTSTRAP_FILENAME,
@@ -621,11 +622,11 @@ export const agentsHandlers: GatewayRequestHandlers = {
     await writeConfigFile(result.config);
 
     if (deleteFiles) {
-      await Promise.all([
-        moveToTrashBestEffort(workspaceDir),
-        moveToTrashBestEffort(agentDir),
-        moveToTrashBestEffort(sessionsDir),
-      ]);
+      const trashTargets = [agentDir, sessionsDir];
+      if (!isAgentWorkspaceShared(cfg, agentId)) {
+        trashTargets.unshift(workspaceDir);
+      }
+      await Promise.all(trashTargets.map((targetPath) => moveToTrashBestEffort(targetPath)));
     }
 
     respond(true, { ok: true, agentId, removedBindings: result.removedBindings }, undefined);

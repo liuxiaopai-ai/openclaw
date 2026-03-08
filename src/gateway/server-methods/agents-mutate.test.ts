@@ -70,6 +70,10 @@ vi.mock("../../browser/trash.js", () => ({
   movePathToTrash: mocks.movePathToTrash,
 }));
 
+vi.mock("../../agents/workspace-dirs.js", () => ({
+  isAgentWorkspaceShared: vi.fn(() => false),
+}));
+
 vi.mock("../../utils.js", () => ({
   resolveUserPath: (p: string) => `/resolved${p.startsWith("/") ? "" : "/"}${p}`,
 }));
@@ -111,6 +115,7 @@ vi.mock("node:fs/promises", async () => {
 /* ------------------------------------------------------------------ */
 
 const { agentsHandlers } = await import("./agents.js");
+const { isAgentWorkspaceShared } = await import("../../agents/workspace-dirs.js");
 
 /* ------------------------------------------------------------------ */
 /* Helpers                                                            */
@@ -448,6 +453,24 @@ describe("agents.delete", () => {
     expect(mocks.writeConfigFile).toHaveBeenCalled();
     // moveToTrashBestEffort calls fs.access then movePathToTrash for each dir
     expect(mocks.movePathToTrash).toHaveBeenCalled();
+  });
+
+  it("keeps a shared workspace when another agent still references it", async () => {
+    vi.mocked(isAgentWorkspaceShared).mockReturnValue(true);
+
+    const { respond, promise } = makeCall("agents.delete", {
+      agentId: "test-agent",
+    });
+    await promise;
+
+    expect(respond).toHaveBeenCalledWith(
+      true,
+      { ok: true, agentId: "test-agent", removedBindings: 2 },
+      undefined,
+    );
+    expect(mocks.movePathToTrash).toHaveBeenCalledTimes(2);
+    expect(mocks.movePathToTrash).toHaveBeenNthCalledWith(1, "/agents/test-agent");
+    expect(mocks.movePathToTrash).toHaveBeenNthCalledWith(2, "/transcripts/test-agent");
   });
 
   it("skips file deletion when deleteFiles is false", async () => {
