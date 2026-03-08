@@ -157,15 +157,9 @@ export function resolveModelWithRegistry(params: {
   const providers = cfg?.models?.providers ?? {};
   const inlineModels = buildInlineProviderModels(providers);
   const normalizedProvider = normalizeProviderId(provider);
-  const inlineMatch = inlineModels.find(
-    (entry) => normalizeProviderId(entry.provider) === normalizedProvider && entry.id === modelId,
-  );
-  if (inlineMatch) {
-    return normalizeModelCompat(inlineMatch as Model<Api>);
-  }
-
-  // Forward-compat fallbacks must be checked BEFORE the generic providerCfg fallback.
-  // Otherwise, configured providers can default to a generic API and break specific transports.
+  // Forward-compat fallbacks must run before inline model matches. Otherwise, a partially
+  // configured inline model (for example custom openai-codex/gpt-5.4 without api) can shadow
+  // built-in transport metadata and resolve to api: undefined.
   const forwardCompat = resolveForwardCompatModel(provider, modelId, modelRegistry);
   if (forwardCompat) {
     return normalizeModelCompat(
@@ -175,6 +169,13 @@ export function resolveModelWithRegistry(params: {
         modelId,
       }),
     );
+  }
+
+  const inlineMatch = inlineModels.find(
+    (entry) => normalizeProviderId(entry.provider) === normalizedProvider && entry.id === modelId,
+  );
+  if (inlineMatch) {
+    return normalizeModelCompat(inlineMatch as Model<Api>);
   }
 
   // OpenRouter is a pass-through proxy - any model ID available on OpenRouter

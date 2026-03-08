@@ -10,6 +10,7 @@ Docs: https://docs.openclaw.ai
 
 - macOS app/chat UI: route browser proxy through the local node browser service, preserve plain-text paste semantics, strip completed assistant trace/debug wrapper noise from transcripts, refresh permission state after returning from System Settings, and tolerate malformed cron rows in the macOS tab. (#39516) Thanks @Imhermes1.
 - Mattermost replies: keep `root_id` pinned to the existing thread root when an agent replies inside a thread, while still using reply-target threading for top-level posts. (#27744) thanks @hnykda.
+- Models/openai-codex: preserve built-in gpt-5.4 transport metadata when custom provider config shadows the model without an explicit `api`, so `openai-codex/gpt-5.4` no longer resolves with `api: undefined` and crash-loops isolated runs. (#39682)
 
 ## 2026.3.7
 

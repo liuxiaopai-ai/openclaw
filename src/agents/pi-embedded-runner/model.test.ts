@@ -480,6 +480,29 @@ describe("resolveModel", () => {
     expect(result.model).toMatchObject(buildOpenAICodexForwardCompatExpectation("gpt-5.4"));
   });
 
+  it("keeps codex transport metadata when inline gpt-5.4 config omits api", () => {
+    mockOpenAICodexTemplateModel();
+
+    const cfg = {
+      models: {
+        providers: {
+          "openai-codex": {
+            baseUrl: "https://custom.example.com/backend-api",
+            models: [{ id: "gpt-5.4", name: "gpt-5.4" }],
+          },
+        },
+      },
+    } as unknown as OpenClawConfig;
+
+    const result = resolveModel("openai-codex", "gpt-5.4", "/tmp/agent", cfg);
+
+    expect(result.error).toBeUndefined();
+    expect(result.model).toMatchObject({
+      ...buildOpenAICodexForwardCompatExpectation("gpt-5.4"),
+      baseUrl: "https://custom.example.com/backend-api",
+    });
+  });
+
   it("applies provider overrides to openai gpt-5.4 forward-compat models", () => {
     mockDiscoveredModel({
       provider: "openai",
