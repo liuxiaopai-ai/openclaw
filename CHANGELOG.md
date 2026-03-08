@@ -10,6 +10,7 @@ Docs: https://docs.openclaw.ai
 
 - macOS app/chat UI: route browser proxy through the local node browser service, preserve plain-text paste semantics, strip completed assistant trace/debug wrapper noise from transcripts, refresh permission state after returning from System Settings, and tolerate malformed cron rows in the macOS tab. (#39516) Thanks @Imhermes1.
 - Mattermost replies: keep `root_id` pinned to the existing thread root when an agent replies inside a thread, while still using reply-target threading for top-level posts. (#27744) thanks @hnykda.
+- Google Chat replies: ignore leaked raw message ids in outbound `thread.name` and only forward valid `spaces/.../threads/...` resources when threading is enabled, so DM replies no longer fail with `invalid thread resource name`. (#39554)
 
 ## 2026.3.7
 

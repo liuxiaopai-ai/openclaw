@@ -167,6 +167,88 @@ describe("googlechat outbound cfg threading", () => {
     );
   });
 
+  it("drops outbound thread metadata when replyToMode is off", async () => {
+    const cfg = {
+      channels: {
+        googlechat: {
+          replyToMode: "off",
+          serviceAccount: {
+            type: "service_account",
+          },
+        },
+      },
+    };
+    const account = {
+      accountId: "default",
+      config: {},
+      credentialSource: "inline",
+    };
+    vi.mocked(resolveGoogleChatAccount).mockReturnValue(account as any);
+    vi.mocked(resolveGoogleChatOutboundSpace).mockResolvedValue("spaces/AAA");
+    vi.mocked(sendGoogleChatMessage).mockResolvedValue({
+      messageName: "spaces/AAA/messages/msg-off",
+    } as any);
+
+    await googlechatPlugin.outbound!.sendText!({
+      cfg: cfg as any,
+      to: "users/123",
+      text: "hello",
+      accountId: "default",
+      threadId: "spaces/AAA/messages/msg-123",
+      replyToId: "spaces/AAA/threads/thread-123",
+    });
+
+    expect(sendGoogleChatMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        account,
+        space: "spaces/AAA",
+        text: "hello",
+        thread: undefined,
+      }),
+    );
+  });
+
+  it("only forwards valid Google Chat thread resources", async () => {
+    const cfg = {
+      channels: {
+        googlechat: {
+          replyToMode: "first",
+          serviceAccount: {
+            type: "service_account",
+          },
+        },
+      },
+    };
+    const account = {
+      accountId: "default",
+      config: {},
+      credentialSource: "inline",
+    };
+    vi.mocked(resolveGoogleChatAccount).mockReturnValue(account as any);
+    vi.mocked(resolveGoogleChatOutboundSpace).mockResolvedValue("spaces/AAA");
+    vi.mocked(sendGoogleChatMessage).mockResolvedValue({
+      messageName: "spaces/AAA/messages/msg-thread",
+    } as any);
+
+    await googlechatPlugin.outbound!.sendText!({
+      cfg: cfg as any,
+      to: "users/123",
+      text: "hello",
+      accountId: "default",
+      threadId: "spaces/AAA/messages/msg-123",
+      replyToId: "spaces/AAA/threads/thread-123",
+    });
+
+    expect(sendGoogleChatMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        account,
+        space: "spaces/AAA",
+        text: "hello",
+        thread: "spaces/AAA/threads/thread-123",
+      }),
+    );
+  });
+
   it("threads resolved cfg into sendMedia account and media loading path", async () => {
     const cfg = {
       channels: {
@@ -225,6 +307,57 @@ describe("googlechat outbound cfg threading", () => {
       expect.objectContaining({
         account,
         attachments: [{ attachmentUploadToken: "token-1", contentName: "file.png" }],
+      }),
+    );
+  });
+
+  it("drops invalid thread ids for media sends", async () => {
+    const cfg = {
+      channels: {
+        googlechat: {
+          replyToMode: "all",
+          serviceAccount: {
+            type: "service_account",
+          },
+          mediaMaxMb: 8,
+        },
+      },
+    };
+    const account = {
+      accountId: "default",
+      config: { mediaMaxMb: 20 },
+      credentialSource: "inline",
+    };
+    vi.mocked(resolveGoogleChatAccount).mockReturnValue(account as any);
+    vi.mocked(resolveGoogleChatOutboundSpace).mockResolvedValue("spaces/AAA");
+    vi.mocked(resolveChannelMediaMaxBytes).mockReturnValue(1024);
+    runtimeMocks.fetchRemoteMedia.mockResolvedValueOnce({
+      buffer: Buffer.from("file"),
+      fileName: "file.png",
+      contentType: "image/png",
+    });
+    vi.mocked(uploadGoogleChatAttachment).mockResolvedValue({
+      attachmentUploadToken: "token-2",
+    } as any);
+    vi.mocked(sendGoogleChatMessage).mockResolvedValue({
+      messageName: "spaces/AAA/messages/msg-2",
+    } as any);
+
+    await googlechatPlugin.outbound!.sendMedia!({
+      cfg: cfg as any,
+      to: "users/123",
+      text: "photo",
+      mediaUrl: "https://example.com/file.png",
+      accountId: "default",
+      threadId: "spaces/AAA/messages/msg-123",
+    });
+
+    expect(sendGoogleChatMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        account,
+        space: "spaces/AAA",
+        text: "photo",
+        thread: undefined,
       }),
     );
   });

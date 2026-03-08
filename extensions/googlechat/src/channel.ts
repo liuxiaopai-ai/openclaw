@@ -57,6 +57,30 @@ const formatAllowFromEntry = (entry: string) =>
     .replace(/^users\//i, "")
     .toLowerCase();
 
+const GOOGLE_CHAT_THREAD_RESOURCE_RE = /^spaces\/[^/]+\/threads\/[^/]+$/;
+
+function normalizeGoogleChatThreadResource(value?: string | null): string | undefined {
+  const trimmed = value?.trim();
+  if (!trimmed) {
+    return undefined;
+  }
+  return GOOGLE_CHAT_THREAD_RESOURCE_RE.test(trimmed) ? trimmed : undefined;
+}
+
+function resolveGoogleChatOutboundThread(params: {
+  cfg: OpenClawConfig;
+  replyToId?: string;
+  threadId?: string;
+}): string | undefined {
+  if ((params.cfg.channels?.["googlechat"]?.replyToMode ?? "off") === "off") {
+    return undefined;
+  }
+  return (
+    normalizeGoogleChatThreadResource(params.replyToId) ??
+    normalizeGoogleChatThreadResource(params.threadId)
+  );
+}
+
 const googleChatConfigAccessors = createScopedAccountConfigAccessors({
   resolveAccount: ({ cfg, accountId }) => resolveGoogleChatAccount({ cfg, accountId }),
   resolveAllowFrom: (account: ResolvedGoogleChatAccount) => account.config.dm?.allowFrom,
@@ -370,7 +394,7 @@ export const googlechatPlugin: ChannelPlugin<ResolvedGoogleChatAccount> = {
         accountId,
       });
       const space = await resolveGoogleChatOutboundSpace({ account, target: to });
-      const thread = (threadId ?? replyToId ?? undefined) as string | undefined;
+      const thread = resolveGoogleChatOutboundThread({ cfg, replyToId, threadId });
       const result = await sendGoogleChatMessage({
         account,
         space,
@@ -401,7 +425,7 @@ export const googlechatPlugin: ChannelPlugin<ResolvedGoogleChatAccount> = {
         accountId,
       });
       const space = await resolveGoogleChatOutboundSpace({ account, target: to });
-      const thread = (threadId ?? replyToId ?? undefined) as string | undefined;
+      const thread = resolveGoogleChatOutboundThread({ cfg, replyToId, threadId });
       const runtime = getGoogleChatRuntime();
       const maxBytes = resolveChannelMediaMaxBytes({
         cfg: cfg,
