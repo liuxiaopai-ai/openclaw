@@ -112,6 +112,10 @@ function safeRealpathSync(dir: string): string | null {
   }
 }
 
+function canonicalizeAgentDir(dir: string): string {
+  return safeRealpathSync(dir) ?? path.resolve(dir);
+}
+
 function resolveSiblingAgentDirs(primaryAgentDir: string): string[] {
   const normalized = path.resolve(primaryAgentDir);
 
@@ -142,10 +146,10 @@ function resolveSiblingAgentDirs(primaryAgentDir: string): string[] {
   const seen = new Set<string>();
   const result: string[] = [];
   for (const dir of [normalized, ...discovered]) {
-    const real = safeRealpathSync(dir);
-    if (real && !seen.has(real)) {
-      seen.add(real);
-      result.push(real);
+    const canonical = canonicalizeAgentDir(dir);
+    if (!seen.has(canonical)) {
+      seen.add(canonical);
+      result.push(canonical);
     }
   }
   return result;

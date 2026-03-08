@@ -226,6 +226,39 @@ describe("writeOAuthCredentials", () => {
     await expect(fs.readFile(authProfilePathFor(mainAgentDir), "utf8")).rejects.toThrow();
   });
 
+  it("syncs sibling auth stores even when a sibling agent dir has not been created yet", async () => {
+    tempStateDir = await fs.mkdtemp(path.join(os.tmpdir(), "openclaw-oauth-missing-agent-"));
+    process.env.OPENCLAW_STATE_DIR = tempStateDir;
+
+    const mainAgentDir = path.join(tempStateDir, "agents", "main", "agent");
+    const kidRootDir = path.join(tempStateDir, "agents", "kid");
+    await fs.mkdir(mainAgentDir, { recursive: true });
+    await fs.mkdir(kidRootDir, { recursive: true });
+
+    process.env.OPENCLAW_AGENT_DIR = mainAgentDir;
+    process.env.PI_CODING_AGENT_DIR = mainAgentDir;
+
+    const creds = {
+      refresh: "refresh-missing-agent",
+      access: "access-missing-agent",
+      expires: Date.now() + 60_000,
+    } satisfies OAuthCredentials;
+
+    await writeOAuthCredentials("openai-codex", creds, undefined, {
+      syncSiblingAgents: true,
+    });
+
+    const kidRaw = await fs.readFile(authProfilePathFor(path.join(kidRootDir, "agent")), "utf8");
+    const kidParsed = JSON.parse(kidRaw) as {
+      profiles?: Record<string, OAuthCredentials & { type?: string }>;
+    };
+    expect(kidParsed.profiles?.["openai-codex:default"]).toMatchObject({
+      refresh: "refresh-missing-agent",
+      access: "access-missing-agent",
+      type: "oauth",
+    });
+  });
+
   it("syncs siblings from explicit agentDir outside OPENCLAW_STATE_DIR", async () => {
     tempStateDir = await fs.mkdtemp(path.join(os.tmpdir(), "openclaw-oauth-external-"));
     process.env.OPENCLAW_STATE_DIR = tempStateDir;
