@@ -1,11 +1,19 @@
 import path from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("node:fs", () => ({
-  default: {
-    existsSync: vi.fn(),
-  },
-}));
+const fsExistsSyncMock = vi.hoisted(() => vi.fn());
+
+vi.mock("node:fs", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("node:fs")>();
+  return {
+    ...actual,
+    existsSync: fsExistsSyncMock,
+    default: {
+      ...actual,
+      existsSync: fsExistsSyncMock,
+    },
+  };
+});
 
 const installPluginFromNpmSpec = vi.fn();
 vi.mock("../../plugins/install.js", () => ({
@@ -16,7 +24,6 @@ vi.mock("../../plugins/loader.js", () => ({
   loadOpenClawPlugins: vi.fn(),
 }));
 
-import fs from "node:fs";
 import type { ChannelPluginCatalogEntry } from "../../channels/plugins/catalog.js";
 import type { OpenClawConfig } from "../../config/config.js";
 import type { WizardPrompter } from "../../wizard/prompts.js";
@@ -44,7 +51,7 @@ beforeEach(() => {
 });
 
 function mockRepoLocalPathExists() {
-  vi.mocked(fs.existsSync).mockImplementation((value) => {
+  fsExistsSyncMock.mockImplementation((value) => {
     const raw = String(value);
     return raw.endsWith(`${path.sep}.git`) || raw.endsWith(`${path.sep}extensions${path.sep}zalo`);
   });
@@ -83,7 +90,7 @@ describe("ensureOnboardingPluginInstalled", () => {
       select: vi.fn(async () => "npm") as WizardPrompter["select"],
     });
     const cfg: OpenClawConfig = { plugins: { allow: ["other"] } };
-    vi.mocked(fs.existsSync).mockReturnValue(false);
+    fsExistsSyncMock.mockReturnValue(false);
     installPluginFromNpmSpec.mockResolvedValue({
       ok: true,
       pluginId: "zalo",
@@ -101,6 +108,7 @@ describe("ensureOnboardingPluginInstalled", () => {
     expect(result.installed).toBe(true);
     expect(result.cfg.plugins?.entries?.zalo?.enabled).toBe(true);
     expect(result.cfg.plugins?.allow).toContain("zalo");
+    expect(result.cfg.plugins?.load?.paths).toContain("/tmp/zalo");
     expect(result.cfg.plugins?.installs?.zalo?.source).toBe("npm");
     expect(result.cfg.plugins?.installs?.zalo?.spec).toBe("@openclaw/zalo");
     expect(result.cfg.plugins?.installs?.zalo?.installPath).toBe("/tmp/zalo");

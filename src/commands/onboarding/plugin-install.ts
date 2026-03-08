@@ -168,6 +168,7 @@ export async function ensureOnboardingPluginInstalled(params: {
   });
 
   if (result.ok) {
+    next = addPluginLoadPath(next, result.targetDir);
     next = enablePluginInConfig(next, result.pluginId).config;
     next = recordPluginInstall(next, {
       pluginId: result.pluginId,
