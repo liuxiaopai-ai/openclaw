@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { stripInboundMetadata } from "../auto-reply/reply/strip-inbound-meta.js";
 import {
   formatSessionArchiveTimestamp,
   parseSessionArchiveTimestamp,
@@ -366,7 +367,9 @@ export function readSessionTitleFieldsFromTranscript(
 
 function extractTextFromContent(content: TranscriptMessage["content"]): string | null {
   if (typeof content === "string") {
-    const normalized = stripInlineDirectiveTagsForDisplay(content).text.trim();
+    const normalized = stripInlineDirectiveTagsForDisplay(
+      stripInboundMetadata(content),
+    ).text.trim();
     return normalized || null;
   }
   if (!Array.isArray(content)) {
@@ -377,7 +380,9 @@ function extractTextFromContent(content: TranscriptMessage["content"]): string |
       continue;
     }
     if (part.type === "text" || part.type === "output_text" || part.type === "input_text") {
-      const normalized = stripInlineDirectiveTagsForDisplay(part.text).text.trim();
+      const normalized = stripInlineDirectiveTagsForDisplay(
+        stripInboundMetadata(part.text),
+      ).text.trim();
       if (normalized) {
         return normalized;
       }

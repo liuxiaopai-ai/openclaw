@@ -93,6 +93,24 @@ describe("readFirstUserMessageFromTranscript", () => {
         ],
         expected: "Input text content",
       },
+      {
+        sessionId: "test-session-meta-prefix",
+        lines: [
+          JSON.stringify({ type: "session", version: 1, id: "test-session-meta-prefix" }),
+          JSON.stringify({
+            message: {
+              role: "user",
+              content: `Sender (untrusted metadata):
+\`\`\`json
+{"label":"openclaw-tui","id":"gateway-client"}
+\`\`\`
+
+Actual user message`,
+            },
+          }),
+        ],
+        expected: "Actual user message",
+      },
     ] as const;
 
     for (const testCase of cases) {

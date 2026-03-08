@@ -150,9 +150,14 @@ function truncateTitle(text: string, maxLen: number): string {
 export function deriveSessionTitle(
   entry: SessionEntry | undefined,
   firstUserMessage?: string | null,
+  displayNameOverride?: string | null,
 ): string | undefined {
   if (!entry) {
     return undefined;
+  }
+
+  if (displayNameOverride?.trim()) {
+    return displayNameOverride.trim();
   }
 
   if (entry.displayName?.trim()) {
@@ -878,7 +883,7 @@ export function listSessionsFromStore(params: {
           agentId,
         );
         if (includeDerivedTitles) {
-          derivedTitle = deriveSessionTitle(entry, fields.firstUserMessage);
+          derivedTitle = deriveSessionTitle(entry, fields.firstUserMessage, rest.displayName);
         }
         if (includeLastMessage && fields.lastMessagePreview) {
           lastMessagePreview = fields.lastMessagePreview;

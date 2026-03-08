@@ -594,6 +594,15 @@ describe("deriveSessionTitle", () => {
     } as SessionEntry;
     expect(deriveSessionTitle(entry)).toBe("Actual Subject");
   });
+
+  test("prefers outer displayName override when provided", () => {
+    const entry = {
+      sessionId: "abc123",
+      updatedAt: Date.now(),
+      subject: "Actual Subject",
+    } as SessionEntry;
+    expect(deriveSessionTitle(entry, "Actual user message", "openclaw-tui")).toBe("openclaw-tui");
+  });
 });
 
 describe("listSessionsFromStore search", () => {
@@ -761,6 +770,52 @@ describe("listSessionsFromStore search", () => {
     expect(stale?.totalTokensFresh).toBe(false);
     expect(missing?.totalTokens).toBeUndefined();
     expect(missing?.totalTokensFresh).toBe(false);
+  });
+
+  test("uses computed displayName before transcript-derived fallback titles", () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "session-utils-display-name-"));
+    try {
+      const storePath = path.join(dir, "sessions.json");
+      const sessionId = "sess-gateway";
+      const sessionFile = `${sessionId}.jsonl`;
+      fs.writeFileSync(
+        path.join(dir, sessionFile),
+        [
+          JSON.stringify({ type: "session", version: 1, id: sessionId }),
+          JSON.stringify({
+            message: {
+              role: "user",
+              content: `Sender (untrusted metadata):
+\`\`\`json
+{"label":"openclaw-tui","id":"gateway-client"}
+\`\`\`
+
+Actual user message`,
+            },
+          }),
+        ].join("\n"),
+        "utf8",
+      );
+
+      const result = listSessionsFromStore({
+        cfg: baseCfg,
+        storePath,
+        store: {
+          "agent:main:main": {
+            sessionId,
+            sessionFile,
+            updatedAt: Date.now(),
+            origin: { label: "openclaw-tui" },
+          } as SessionEntry,
+        },
+        opts: { includeDerivedTitles: true },
+      });
+
+      expect(result.sessions[0]?.displayName).toBe("openclaw-tui");
+      expect(result.sessions[0]?.derivedTitle).toBe("openclaw-tui");
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
 
