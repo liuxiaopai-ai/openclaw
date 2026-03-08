@@ -175,6 +175,52 @@ describe("handleToolExecutionEnd cron.add commitment tracking", () => {
   });
 });
 
+describe("handleToolExecutionEnd lastToolError recovery", () => {
+  it("clears failed edit warnings after a successful retry with file_path aliases", async () => {
+    const { ctx } = createTestContext();
+
+    await handleToolExecutionStart(ctx, {
+      type: "tool_execution_start",
+      toolName: "edit",
+      toolCallId: "tool-edit-fail",
+      args: {
+        file_path: "/tmp/demo.txt",
+        old_string: "wrong old text",
+        new_string: "updated text",
+      },
+    });
+    await handleToolExecutionEnd(ctx, {
+      type: "tool_execution_end",
+      toolName: "edit",
+      toolCallId: "tool-edit-fail",
+      isError: true,
+      result: { error: "Could not find the exact text" },
+    });
+
+    expect(ctx.state.lastToolError?.toolName).toBe("edit");
+
+    await handleToolExecutionStart(ctx, {
+      type: "tool_execution_start",
+      toolName: "edit",
+      toolCallId: "tool-edit-success",
+      args: {
+        file_path: "/tmp/demo.txt",
+        old_string: "corrected old text with different length",
+        new_string: "updated text",
+      },
+    });
+    await handleToolExecutionEnd(ctx, {
+      type: "tool_execution_end",
+      toolName: "edit",
+      toolCallId: "tool-edit-success",
+      isError: false,
+      result: { ok: true },
+    });
+
+    expect(ctx.state.lastToolError).toBeUndefined();
+  });
+});
+
 describe("messaging tool media URL tracking", () => {
   it("tracks media arg from messaging tool as pending", async () => {
     const { ctx } = createTestContext();

@@ -37,6 +37,21 @@ describe("tool mutation helpers", () => {
     expect(readFingerprint).toBeUndefined();
   });
 
+  it("uses stable target aliases before falling back to volatile edit meta", () => {
+    const editFingerprint = buildToolActionFingerprint(
+      "edit",
+      {
+        file_path: "/tmp/demo.txt",
+        old_string: "hello",
+        new_string: "hello world",
+      },
+      "in /tmp/demo.txt (11 chars)",
+    );
+    expect(editFingerprint).toContain("tool=edit");
+    expect(editFingerprint).toContain("file_path=/tmp/demo.txt");
+    expect(editFingerprint).not.toContain("meta=in /tmp/demo.txt (11 chars)");
+  });
+
   it("exposes mutation state for downstream payload rendering", () => {
     expect(
       buildToolMutationState("message", { action: "send", to: "telegram:1" }).mutatingAction,
@@ -63,6 +78,35 @@ describe("tool mutation helpers", () => {
         { toolName: "write" },
       ),
     ).toBe(false);
+  });
+
+  it("matches edit retries that use file_path aliases even when meta text changes", () => {
+    const failedEdit = {
+      toolName: "edit",
+      actionFingerprint: buildToolActionFingerprint(
+        "edit",
+        {
+          file_path: "/tmp/demo.txt",
+          old_string: "wrong old text",
+          new_string: "updated text",
+        },
+        "in /tmp/demo.txt (12 chars)",
+      ),
+    };
+    const successfulRetry = {
+      toolName: "edit",
+      actionFingerprint: buildToolActionFingerprint(
+        "edit",
+        {
+          file_path: "/tmp/demo.txt",
+          old_string: "corrected old text with different length",
+          new_string: "updated text",
+        },
+        "in /tmp/demo.txt (40 chars)",
+      ),
+    };
+
+    expect(isSameToolMutationAction(failedEdit, successfulRetry)).toBe(true);
   });
 
   it("keeps legacy name-only mutating heuristics for payload fallback", () => {
