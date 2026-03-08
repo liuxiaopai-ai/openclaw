@@ -139,6 +139,7 @@ export type PluginRegistry = {
   services: PluginServiceRegistration[];
   commands: PluginCommandRegistration[];
   diagnostics: PluginDiagnostic[];
+  ready?: Promise<void>;
 };
 
 export type PluginRegistryParams = {
@@ -179,6 +180,7 @@ export function createEmptyPluginRegistry(): PluginRegistry {
     services: [],
     commands: [],
     diagnostics: [],
+    ready: Promise.resolve(),
   };
 }
 

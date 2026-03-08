@@ -617,6 +617,7 @@ export function loadOpenClawPlugins(options: PluginLoadOptions = {}): PluginRegi
   const manifestByRoot = new Map(
     manifestRegistry.plugins.map((record) => [record.rootDir, record]),
   );
+  const pendingRegistrations: Promise<void>[] = [];
 
   const seenIds = new Map<string, PluginRecord["origin"]>();
   const memorySlot = normalized.slots.memory;
@@ -832,12 +833,22 @@ export function loadOpenClawPlugins(options: PluginLoadOptions = {}): PluginRegi
     try {
       const result = register(api);
       if (result && typeof result.then === "function") {
-        registry.diagnostics.push({
-          level: "warn",
-          pluginId: record.id,
-          source: record.source,
-          message: "plugin register returned a promise; async registration is ignored",
-        });
+        pendingRegistrations.push(
+          Promise.resolve(result).catch((err) => {
+            const errorText = String(err);
+            logger.error(
+              `[plugins] ${record.id} failed during async register from ${record.source}: ${errorText}`,
+            );
+            record.status = "error";
+            record.error = errorText;
+            registry.diagnostics.push({
+              level: "error",
+              pluginId: record.id,
+              source: record.source,
+              message: `plugin failed during async register: ${errorText}`,
+            });
+          }),
+        );
       }
       registry.plugins.push(record);
       seenIds.set(pluginId, candidate.origin);
@@ -855,6 +866,9 @@ export function loadOpenClawPlugins(options: PluginLoadOptions = {}): PluginRegi
       });
     }
   }
+
+  registry.ready =
+    pendingRegistrations.length > 0 ? Promise.all(pendingRegistrations).then(() => {}) : undefined;
 
   if (typeof memorySlot === "string" && !memorySlotMatched) {
     registry.diagnostics.push({

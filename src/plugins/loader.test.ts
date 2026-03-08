@@ -2,6 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
+import { listContextEngineIds } from "../context-engine/registry.js";
 import { withEnv } from "../test-utils/env.js";
 import { getGlobalHookRunner, resetGlobalHookRunner } from "./hook-runner-global.js";
 import { createHookRunner } from "./hooks.js";
@@ -950,6 +951,44 @@ describe("loadOpenClawPlugins", () => {
     const b = registry.plugins.find((entry) => entry.id === "memory-b");
     expect(b?.status).toBe("loaded");
     expect(a?.status).toBe("disabled");
+  });
+
+  it("exposes a ready promise for async plugin registration", async () => {
+    useNoBundledPlugins();
+    const engineId = `async-context-${tempDirIndex}`;
+    const plugin = writePlugin({
+      id: "async-context-plugin",
+      body: `module.exports = {
+        id: "async-context-plugin",
+        kind: "context-engine",
+        register(api) {
+          return new Promise((resolve) => {
+            setTimeout(() => {
+              api.registerContextEngine("${engineId}", () => ({ id: "${engineId}" }));
+              resolve();
+            }, 0);
+          });
+        },
+      };`,
+    });
+
+    const registry = loadOpenClawPlugins({
+      cache: false,
+      workspaceDir: plugin.dir,
+      config: {
+        plugins: {
+          load: { paths: [plugin.file] },
+          allow: ["async-context-plugin"],
+          entries: {
+            "async-context-plugin": { enabled: true },
+          },
+        },
+      },
+    });
+
+    expect(registry.ready).toBeDefined();
+    await registry.ready;
+    expect(listContextEngineIds()).toContain(engineId);
   });
 
   it("skips importing bundled memory plugins that are disabled by memory slot", () => {
