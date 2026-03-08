@@ -140,3 +140,52 @@ describe("app-tool-stream fallback lifecycle handling", () => {
     vi.useRealTimers();
   });
 });
+
+describe("app-tool-stream compaction handling", () => {
+  beforeAll(() => {
+    const globalWithWindow = globalThis as typeof globalThis & {
+      window?: Window & typeof globalThis;
+    };
+    if (!globalWithWindow.window) {
+      globalWithWindow.window = globalThis as unknown as Window & typeof globalThis;
+    }
+  });
+
+  it("accepts session-scoped compaction events when idle for the active session", () => {
+    const host = createHost();
+
+    handleAgentEvent(host, {
+      runId: "run-1",
+      seq: 1,
+      stream: "compaction",
+      ts: Date.now(),
+      sessionKey: "main",
+      data: {
+        phase: "start",
+      },
+    });
+
+    expect(host.compactionStatus).toEqual({
+      active: true,
+      startedAt: expect.any(Number),
+      completedAt: null,
+    });
+  });
+
+  it("ignores idle compaction events for other sessions", () => {
+    const host = createHost();
+
+    handleAgentEvent(host, {
+      runId: "run-1",
+      seq: 1,
+      stream: "compaction",
+      ts: Date.now(),
+      sessionKey: "agent:other:main",
+      data: {
+        phase: "start",
+      },
+    });
+
+    expect(host.compactionStatus).toBeNull();
+  });
+});
