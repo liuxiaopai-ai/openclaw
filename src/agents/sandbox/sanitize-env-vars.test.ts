@@ -28,18 +28,36 @@ describe("sanitizeEnvVars", () => {
     expect(result.blocked).toEqual(expect.arrayContaining(["MY_TOKEN", "MY_SECRET"]));
   });
 
-  it("adds warnings for suspicious values", () => {
-    const base64Like =
-      "YWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYQ==";
+  it("does not warn for long alphanumeric-only values", () => {
+    const alphanumericOnly = "A".repeat(132);
+    const result = sanitizeEnvVars({
+      USER: "alice",
+      SAFE_TEXT: alphanumericOnly,
+    });
+
+    expect(result.allowed).toEqual({ USER: "alice", SAFE_TEXT: alphanumericOnly });
+    expect(result.warnings).toEqual([]);
+  });
+
+  it("adds warnings for padded base64-like values", () => {
+    const base64Like = Buffer.alloc(97, 0xff).toString("base64");
     const result = sanitizeEnvVars({
       USER: "alice",
       SAFE_TEXT: base64Like,
-      NULL: "a\0b",
     });
 
     expect(result.allowed).toEqual({ USER: "alice", SAFE_TEXT: base64Like });
-    expect(result.blocked).toContain("NULL");
     expect(result.warnings).toContain("SAFE_TEXT: Value looks like base64-encoded credential data");
+  });
+
+  it("blocks null-byte values even when warnings are otherwise empty", () => {
+    const result = sanitizeEnvVars({
+      USER: "alice",
+      NULL: "a\0b",
+    });
+
+    expect(result.allowed).toEqual({ USER: "alice" });
+    expect(result.blocked).toContain("NULL");
   });
 
   it("supports strict mode with explicit allowlist", () => {
