@@ -29,8 +29,7 @@ describe("sanitizeEnvVars", () => {
   });
 
   it("adds warnings for suspicious values", () => {
-    const base64Like =
-      "YWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYQ==";
+    const base64Like = Buffer.alloc(95, 0xff).toString("base64");
     const result = sanitizeEnvVars({
       USER: "alice",
       SAFE_TEXT: base64Like,
@@ -40,6 +39,20 @@ describe("sanitizeEnvVars", () => {
     expect(result.allowed).toEqual({ USER: "alice", SAFE_TEXT: base64Like });
     expect(result.blocked).toContain("NULL");
     expect(result.warnings).toContain("SAFE_TEXT: Value looks like base64-encoded credential data");
+  });
+
+  it("does not warn on long alphanumeric values without base64 structure markers", () => {
+    const longAlphaNumeric = "abc123".repeat(20);
+    const result = sanitizeEnvVars({
+      USER: "alice",
+      BUILD_CONTEXT: longAlphaNumeric,
+    });
+
+    expect(result.allowed).toEqual({
+      USER: "alice",
+      BUILD_CONTEXT: longAlphaNumeric,
+    });
+    expect(result.warnings).toEqual([]);
   });
 
   it("supports strict mode with explicit allowlist", () => {

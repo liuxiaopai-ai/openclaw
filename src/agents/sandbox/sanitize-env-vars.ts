@@ -42,6 +42,20 @@ export type EnvSanitizationOptions = {
   customAllowedPatterns?: ReadonlyArray<RegExp>;
 };
 
+function looksLikeBase64CredentialData(value: string): boolean {
+  if (value.length < 128 || value.length % 4 !== 0) {
+    return false;
+  }
+  if (!/^[A-Za-z0-9+/]+={0,2}$/.test(value)) {
+    return false;
+  }
+  const firstPaddingIndex = value.indexOf("=");
+  if (firstPaddingIndex !== -1 && !/^=+$/.test(value.slice(firstPaddingIndex))) {
+    return false;
+  }
+  return /[+/=]/.test(value);
+}
+
 export function validateEnvVarValue(value: string): string | undefined {
   if (value.includes("\0")) {
     return "Contains null bytes";
@@ -49,7 +63,7 @@ export function validateEnvVarValue(value: string): string | undefined {
   if (value.length > 32768) {
     return "Value exceeds maximum length";
   }
-  if (/^[A-Za-z0-9+/=]{80,}$/.test(value)) {
+  if (looksLikeBase64CredentialData(value)) {
     return "Value looks like base64-encoded credential data";
   }
   return undefined;
