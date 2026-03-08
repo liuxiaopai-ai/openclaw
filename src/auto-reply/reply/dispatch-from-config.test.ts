@@ -164,6 +164,11 @@ function createDispatcher(): ReplyDispatcher {
   };
 }
 
+async function flushAsyncHooks() {
+  await Promise.resolve();
+  await Promise.resolve();
+}
+
 function setNoAbort() {
   mocks.tryFastAbortFromMessage.mockResolvedValue(noAbortResult);
 }
@@ -1624,6 +1629,40 @@ describe("dispatchReplyFromConfig", () => {
       }),
     );
     expect(internalHookMocks.triggerInternalHook).toHaveBeenCalledTimes(1);
+  });
+
+  it("routes internal message:received hook replies back to the conversation", async () => {
+    setNoAbort();
+    const cfg = emptyConfig;
+    const dispatcher = createDispatcher();
+    const ctx = buildTestCtx({
+      Provider: "feishu",
+      Surface: "feishu",
+      SessionKey: "agent:main:main",
+      Body: "hello",
+      CommandBody: "hello",
+      From: "feishu:user-1",
+      To: "feishu:chat-1",
+    });
+    internalHookMocks.triggerInternalHook.mockImplementationOnce(async (event) => {
+      event.messages.push("Hook reply");
+    });
+
+    const replyResolver = async () => ({ text: "hi" }) satisfies ReplyPayload;
+    await dispatchReplyFromConfig({ ctx, cfg, dispatcher, replyResolver });
+    await flushAsyncHooks();
+
+    expect(mocks.routeReply).toHaveBeenCalledWith(
+      expect.objectContaining({
+        payload: { text: "Hook reply" },
+        channel: "feishu",
+        to: "feishu:chat-1",
+        sessionKey: "agent:main:main",
+        mirror: false,
+        skipMessageHooks: true,
+      }),
+    );
+    expect(dispatcher.sendFinalReply).toHaveBeenCalledWith({ text: "hi" });
   });
 
   it("skips internal message:received hook when session key is unavailable", async () => {

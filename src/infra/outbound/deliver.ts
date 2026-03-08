@@ -247,6 +247,8 @@ type DeliverOutboundPayloadsCoreParams = {
     /** Group or channel identifier for correlation with received events */
     groupId?: string;
   };
+  /** Suppress message_sending/message:sent hook emission for synthesized replies. */
+  skipMessageHooks?: boolean;
   silent?: boolean;
 };
 
@@ -331,12 +333,19 @@ function buildPayloadSummary(payload: ReplyPayload): NormalizedOutboundPayload {
 
 function createMessageSentEmitter(params: {
   hookRunner: ReturnType<typeof getGlobalHookRunner>;
+  cfg: OpenClawConfig;
   channel: Exclude<OutboundChannel, "none">;
   to: string;
   accountId?: string;
   sessionKeyForInternalHooks?: string;
   mirrorIsGroup?: boolean;
   mirrorGroupId?: string;
+  replyToId?: string | null;
+  threadId?: string | number | null;
+  deps?: OutboundSendDeps;
+  identity?: OutboundIdentity;
+  gifPlayback?: boolean;
+  silent?: boolean;
 }): { emitMessageSent: (event: MessageSentEvent) => void; hasMessageSentHooks: boolean } {
   const hasMessageSentHooks = params.hookRunner?.hasHooks("message_sent") ?? false;
   const canEmitInternalHook = Boolean(params.sessionKeyForInternalHooks);
@@ -371,15 +380,37 @@ function createMessageSentEmitter(params: {
     if (!canEmitInternalHook) {
       return;
     }
+    const hookEvent = createInternalHookEvent(
+      "message",
+      "sent",
+      params.sessionKeyForInternalHooks!,
+      toInternalMessageSentContext(canonical),
+    );
     fireAndForgetHook(
-      triggerInternalHook(
-        createInternalHookEvent(
-          "message",
-          "sent",
-          params.sessionKeyForInternalHooks!,
-          toInternalMessageSentContext(canonical),
-        ),
-      ),
+      (async () => {
+        await triggerInternalHook(hookEvent);
+        const hookPayloads = hookEvent.messages
+          .map((message) => message.trim())
+          .filter(Boolean)
+          .map((text) => ({ text }));
+        if (hookPayloads.length === 0) {
+          return;
+        }
+        await deliverOutboundPayloadsCore({
+          cfg: params.cfg,
+          channel: params.channel,
+          to: params.to,
+          accountId: params.accountId,
+          payloads: hookPayloads,
+          replyToId: params.replyToId,
+          threadId: params.threadId,
+          deps: params.deps,
+          identity: params.identity,
+          gifPlayback: params.gifPlayback,
+          skipMessageHooks: true,
+          silent: params.silent,
+        });
+      })(),
       "deliverOutboundPayloads: message:sent internal hook failed",
       (message) => {
         log.warn(message);
@@ -663,20 +694,28 @@ async function deliverOutboundPayloadsCore(
     };
   };
   const normalizedPayloads = normalizePayloadsForChannelDelivery(payloads, channel);
-  const hookRunner = getGlobalHookRunner();
+  const hookRunner = params.skipMessageHooks ? null : getGlobalHookRunner();
   const sessionKeyForInternalHooks = params.mirror?.sessionKey ?? params.session?.key;
   const mirrorIsGroup = params.mirror?.isGroup;
   const mirrorGroupId = params.mirror?.groupId;
   const { emitMessageSent, hasMessageSentHooks } = createMessageSentEmitter({
     hookRunner,
+    cfg,
     channel,
     to,
     accountId,
     sessionKeyForInternalHooks,
     mirrorIsGroup,
     mirrorGroupId,
+    replyToId: params.replyToId,
+    threadId: params.threadId,
+    deps,
+    identity: params.identity,
+    gifPlayback: params.gifPlayback,
+    silent: params.silent,
   });
-  const hasMessageSendingHooks = hookRunner?.hasHooks("message_sending") ?? false;
+  const hasMessageSendingHooks =
+    !params.skipMessageHooks && (hookRunner?.hasHooks("message_sending") ?? false);
   if (hasMessageSentHooks && params.session?.agentId && !sessionKeyForInternalHooks) {
     log.warn(
       "deliverOutboundPayloads: session.agentId present without session key; internal message:sent hook will be skipped",

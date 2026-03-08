@@ -194,19 +194,6 @@ export async function dispatchReplyFromConfig(params: {
     );
   }
 
-  // Bridge to internal hooks (HOOK.md discovery system) - refs #8807
-  if (sessionKey) {
-    fireAndForgetHook(
-      triggerInternalHook(
-        createInternalHookEvent("message", "received", sessionKey, {
-          ...toInternalMessageReceivedContext(hookContext),
-          timestamp,
-        }),
-      ),
-      "dispatch-from-config: message_received internal hook failed",
-    );
-  }
-
   // Check if we should route replies to originating channel instead of dispatcher.
   // Only route when the originating channel is DIFFERENT from the current surface.
   // This handles cross-provider routing (e.g., message from Telegram being processed
@@ -270,6 +257,56 @@ export async function dispatchReplyFromConfig(params: {
       logVerbose(`dispatch-from-config: route-reply failed: ${result.error ?? "unknown error"}`);
     }
   };
+
+  const sendInternalHookMessages = async (messages: string[]): Promise<void> => {
+    const text = messages
+      .map((message) => message.trim())
+      .filter(Boolean)
+      .join("\n\n");
+    if (!text) {
+      return;
+    }
+    const hookReplyChannel = shouldRouteToOriginating ? originatingChannel : currentSurface;
+    const hookReplyTo = shouldRouteToOriginating ? originatingTo : hookContext.conversationId;
+    if (!isRoutableChannel(hookReplyChannel) || !hookReplyTo) {
+      return;
+    }
+    const result = await routeReply({
+      payload: { text },
+      channel: hookReplyChannel,
+      to: hookReplyTo,
+      sessionKey: ctx.SessionKey,
+      accountId: ctx.AccountId,
+      threadId: ctx.MessageThreadId,
+      cfg,
+      mirror: false,
+      skipMessageHooks: true,
+      isGroup,
+      groupId,
+    });
+    if (!result.ok) {
+      logVerbose(
+        `dispatch-from-config: message_received hook reply failed: ${result.error ?? "unknown error"}`,
+      );
+    }
+  };
+
+  const internalMessageReceivedHook = sessionKey
+    ? createInternalHookEvent("message", "received", sessionKey, {
+        ...toInternalMessageReceivedContext(hookContext),
+        timestamp,
+      })
+    : null;
+
+  if (internalMessageReceivedHook) {
+    fireAndForgetHook(
+      (async () => {
+        await triggerInternalHook(internalMessageReceivedHook);
+        await sendInternalHookMessages(internalMessageReceivedHook.messages);
+      })(),
+      "dispatch-from-config: message_received internal hook failed",
+    );
+  }
 
   markProcessing();
 

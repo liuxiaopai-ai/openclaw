@@ -148,6 +148,12 @@ async function deliverSingleWhatsAppForHookTest(params?: { sessionKey?: string }
     deps: { sendWhatsApp },
     ...(params?.sessionKey ? { session: { key: params.sessionKey } } : {}),
   });
+  return { sendWhatsApp };
+}
+
+async function flushAsyncHooks() {
+  await Promise.resolve();
+  await Promise.resolve();
 }
 
 async function runBestEffortPartialFailureDelivery() {
@@ -706,6 +712,22 @@ describe("deliverOutboundPayloads", () => {
       "agent:main:main",
       expectSuccessfulWhatsAppInternalHookPayload({ content: "hello", messageId: "w1" }),
     );
+    expect(internalHookMocks.triggerInternalHook).toHaveBeenCalledTimes(1);
+  });
+
+  it("delivers internal message:sent hook replies without re-emitting message hooks", async () => {
+    internalHookMocks.triggerInternalHook.mockImplementationOnce(async (event) => {
+      event.messages.push("hook reply");
+    });
+
+    const { sendWhatsApp } = await deliverSingleWhatsAppForHookTest({
+      sessionKey: "agent:main:main",
+    });
+    await flushAsyncHooks();
+
+    expect(sendWhatsApp).toHaveBeenCalledTimes(2);
+    expect(sendWhatsApp.mock.calls[1]).toEqual(["+1555", "hook reply", expect.any(Object)]);
+    expect(internalHookMocks.createInternalHookEvent).toHaveBeenCalledTimes(1);
     expect(internalHookMocks.triggerInternalHook).toHaveBeenCalledTimes(1);
   });
 
