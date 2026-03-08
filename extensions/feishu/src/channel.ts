@@ -42,6 +42,19 @@ const meta: ChannelMeta = {
   order: 70,
 };
 
+function resolveFeishuReplyToMode(params: {
+  cfg: ClawdbotConfig;
+  accountId?: string | null;
+  chatType?: string | null;
+}): "off" | "first" | "all" {
+  const account = resolveFeishuAccount({ cfg: params.cfg, accountId: params.accountId });
+  const configured = account.config?.replyToMode;
+  if (configured === "off" || configured === "first" || configured === "all") {
+    return configured;
+  }
+  return params.chatType === "direct" ? "off" : "all";
+}
+
 const secretInputJsonSchema = {
   oneOf: [
     { type: "string" },
@@ -116,6 +129,11 @@ export const feishuPlugin: ChannelPlugin<ResolvedFeishuAccount> = {
   groups: {
     resolveToolPolicy: resolveFeishuGroupToolPolicy,
   },
+  threading: {
+    resolveReplyToMode: ({ cfg, accountId, chatType }) =>
+      resolveFeishuReplyToMode({ cfg, accountId, chatType }),
+    allowExplicitReplyTagsWhenOff: false,
+  },
   mentions: {
     stripPatterns: () => ['<at user_id="[^"]*">[^<]*</at>'],
   },
@@ -154,6 +172,7 @@ export const feishuPlugin: ChannelPlugin<ResolvedFeishuAccount> = {
           enum: ["group", "group_sender", "group_topic", "group_topic_sender"],
         },
         topicSessionMode: { type: "string", enum: ["disabled", "enabled"] },
+        replyToMode: { type: "string", enum: ["off", "first", "all"] },
         replyInThread: { type: "string", enum: ["disabled", "enabled"] },
         historyLimit: { type: "integer", minimum: 0 },
         dmHistoryLimit: { type: "integer", minimum: 0 },
@@ -177,6 +196,7 @@ export const feishuPlugin: ChannelPlugin<ResolvedFeishuAccount> = {
               webhookHost: { type: "string" },
               webhookPath: { type: "string" },
               webhookPort: { type: "integer", minimum: 1 },
+              replyToMode: { type: "string", enum: ["off", "first", "all"] },
             },
           },
         },

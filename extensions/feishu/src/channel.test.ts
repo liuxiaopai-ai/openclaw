@@ -46,3 +46,66 @@ describe("feishuPlugin.status.probeAccount", () => {
     expect(result).toMatchObject({ ok: true, appId: "cli_main" });
   });
 });
+
+describe("feishuPlugin.threading.resolveReplyToMode", () => {
+  it("defaults Feishu DMs to replyToMode=off", () => {
+    const cfg = {
+      channels: {
+        feishu: {
+          enabled: true,
+          appId: "cli_main",
+          appSecret: "secret_main",
+        },
+      },
+    } as OpenClawConfig;
+
+    const resolved = feishuPlugin.threading?.resolveReplyToMode?.({
+      cfg,
+      accountId: "default",
+      chatType: "direct",
+    });
+
+    expect(resolved).toBe("off");
+  });
+
+  it("defaults Feishu groups to replyToMode=all", () => {
+    const cfg = {
+      channels: {
+        feishu: {
+          enabled: true,
+          appId: "cli_main",
+          appSecret: "secret_main",
+        },
+      },
+    } as OpenClawConfig;
+
+    const resolved = feishuPlugin.threading?.resolveReplyToMode?.({
+      cfg,
+      accountId: "default",
+      chatType: "group",
+    });
+
+    expect(resolved).toBe("all");
+  });
+
+  it("honors explicit Feishu replyToMode config", () => {
+    const cfg = {
+      channels: {
+        feishu: {
+          enabled: true,
+          appId: "cli_main",
+          appSecret: "secret_main",
+          replyToMode: "off",
+        },
+      },
+    } as OpenClawConfig;
+
+    const resolved = feishuPlugin.threading?.resolveReplyToMode?.({
+      cfg,
+      accountId: "default",
+      chatType: "group",
+    });
+
+    expect(resolved).toBe("off");
+  });
+});

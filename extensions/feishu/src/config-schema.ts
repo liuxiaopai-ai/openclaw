@@ -120,6 +120,7 @@ const GroupSessionScopeSchema = z
  */
 const TopicSessionModeSchema = z.enum(["disabled", "enabled"]).optional();
 const ReactionNotificationModeSchema = z.enum(["off", "own", "all"]).optional();
+const ReplyToModeSchema = z.enum(["off", "first", "all"]).optional();
 
 /**
  * Reply-in-thread mode for group chats.
@@ -170,6 +171,7 @@ const FeishuSharedConfigShape = {
   renderMode: RenderModeSchema,
   streaming: StreamingModeSchema,
   tools: FeishuToolsConfigSchema,
+  replyToMode: ReplyToModeSchema,
   replyInThread: ReplyInThreadSchema,
   reactionNotifications: ReactionNotificationModeSchema,
   typingIndicator: z.boolean().optional(),

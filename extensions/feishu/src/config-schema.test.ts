@@ -143,6 +143,25 @@ describe("FeishuConfigSchema replyInThread", () => {
     });
     expect(result.accounts?.main?.replyInThread).toBe("enabled");
   });
+
+  it("accepts replyToMode at top level", () => {
+    const result = FeishuConfigSchema.parse({ replyToMode: "off" });
+    expect(result.replyToMode).toBe("off");
+  });
+
+  it("accepts replyToMode in account config", () => {
+    const result = FeishuConfigSchema.parse({
+      accounts: {
+        main: { replyToMode: "first" },
+      },
+    });
+    expect(result.accounts?.main?.replyToMode).toBe("first");
+  });
+
+  it("rejects invalid replyToMode value", () => {
+    const result = FeishuConfigSchema.safeParse({ replyToMode: "sometimes" });
+    expect(result.success).toBe(false);
+  });
 });
 
 describe("FeishuConfigSchema optimization flags", () => {
