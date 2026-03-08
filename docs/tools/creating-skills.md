@@ -47,6 +47,18 @@ You can define custom tools in the frontmatter or instruct the agent to use exis
 
 Ask your agent to "refresh skills" or restart the gateway. OpenClaw will discover the new directory and index the `SKILL.md`.
 
+## Advanced Features
+
+Once the hello-world flow works, these are the next features most skill authors need:
+
+- **Conditional activation**: gate skills on binaries, env vars, config flags, or OS support with `metadata.openclaw.requires` and related fields. See [Skills gating](/tools/skills#gating-load-time-filters).
+- **Secrets and env injection**: wire API keys and other env values through `skills.entries.<name>.apiKey` and `skills.entries.<name>.env` instead of hardcoding them in `SKILL.md`. See [Skills](/tools/skills), especially the config overrides and environment injection sections.
+- **Command dispatch**: expose a skill as a slash command with `command-dispatch`, `command-tool`, and `command-arg-mode` when you want direct tool routing instead of model reasoning. See [Skills](/tools/skills) for the supported frontmatter fields.
+- **Portable paths**: use `{baseDir}` in instructions so scripts and resources resolve from the skill folder on any machine. See [Skills](/tools/skills) for format details.
+- **Invocation control**: use `user-invocable` and `disable-model-invocation` to control whether a skill appears as a slash command, in the model prompt, or both. See [Skills](/tools/skills) for the frontmatter reference.
+- **Testing strategies**: test the happy path, missing dependency path, and missing-secret path, then start a fresh session to confirm the updated snapshot is picked up. For broader workflows, see [Testing](/help/testing).
+- **Frontmatter reference**: for the full supported frontmatter surface, use [Skills](/tools/skills) as the canonical reference.
+
 ## Best Practices
 
 - **Be Concise**: Instruct the model on _what_ to do, not how to be an AI.
